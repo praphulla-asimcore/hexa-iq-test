@@ -12,14 +12,34 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Database Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/hexa-iq-test', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => {
+// Serverless-safe cached MongoDB connection
+let cachedConnection = null;
+
+async function connectDB() {
+  if (cachedConnection && mongoose.connection.readyState === 1) {
+    return cachedConnection;
+  }
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    throw new Error('MONGODB_URI environment variable is not set');
+  }
+  cachedConnection = await mongoose.connect(uri, {
+    bufferCommands: false,
+    serverSelectionTimeoutMS: 10000,
+  });
   console.log('MongoDB connected');
-}).catch(err => {
-  console.log('MongoDB connection error:', err);
+  return cachedConnection;
+}
+
+// Ensure DB is connected before every request
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('MongoDB connection failed:', err.message);
+    res.status(503).json({ error: 'Database unavailable', detail: err.message });
+  }
 });
 
 // Routes
@@ -30,7 +50,7 @@ app.use('/api/results', require('./routes/results'));
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
+  res.json({ status: 'OK', message: 'Server is running', db: mongoose.connection.readyState });
 });
 
 if (require.main === module) {
