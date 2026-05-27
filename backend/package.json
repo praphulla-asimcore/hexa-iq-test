@@ -17,8 +17,7 @@
     "cors": "^2.8.5",
     "helmet": "^7.0.0",
     "express-validator": "^7.0.0",
-    "uuid": "^9.0.0",
-    "fingerprint-js2": "^2.1.0"
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.20"
