@@ -1,0 +1,209 @@
+/* Test Result Styles */
+.result-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.result-box {
+  background: white;
+  padding: 40px;
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  max-width: 600px;
+  width: 100%;
+}
+
+.result-header {
+  text-align: center;
+  margin-bottom: 40px;
+  border-bottom: 3px solid #667eea;
+  padding-bottom: 30px;
+}
+
+.result-header img {
+  height: 80px;
+  margin-bottom: 15px;
+}
+
+.result-header h1 {
+  color: #667eea;
+  font-size: 2rem;
+}
+
+.result-content {
+  margin-bottom: 40px;
+}
+
+.result-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 30px;
+  background: #f8f9fa;
+  padding: 25px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+}
+
+.result-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.result-item .label {
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.result-item .value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.grade {
+  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  color: white;
+  margin: 0 auto;
+}
+
+.grade-A {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.grade-B {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+}
+
+.grade-C {
+  background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+}
+
+.grade-D {
+  background: linear-gradient(135deg, #fd7e14 0%, #e56a00 100%);
+}
+
+.grade-F {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+}
+
+.result-message {
+  background: #d4edda;
+  border-left: 4px solid #28a745;
+  padding: 20px;
+  border-radius: 5px;
+  margin-bottom: 30px;
+  color: #155724;
+  font-weight: 600;
+  text-align: center;
+  font-size: 1.1rem;
+}
+
+.result-message p {
+  margin: 0;
+}
+
+.fingerprint-section {
+  background: #f0f0f0;
+  padding: 20px;
+  border-radius: 5px;
+  margin-bottom: 30px;
+}
+
+.fingerprint-section h3 {
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.fingerprint-info {
+  background: white;
+  padding: 12px;
+  border-radius: 3px;
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 15px;
+}
+
+.suspicious-activities {
+  background: #fff3cd;
+  padding: 15px;
+  border-radius: 3px;
+  border-left: 4px solid #ffc107;
+  color: #856404;
+}
+
+.suspicious-activities h4 {
+  margin-bottom: 10px;
+  margin-top: 0;
+}
+
+.suspicious-activities ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.suspicious-activities li {
+  margin: 5px 0;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.btn-close {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: bold;
+  flex: 1;
+  padding: 14px;
+}
+
+.btn-close:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.result-footer {
+  text-align: center;
+  padding-top: 20px;
+  border-top: 2px solid #e0e0e0;
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.result-footer p {
+  margin: 5px 0;
+}
+
+@media (max-width: 600px) {
+  .result-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .result-box {
+    padding: 25px;
+  }
+
+  .result-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .result-item .value {
+    font-size: 1.5rem;
+  }
+}

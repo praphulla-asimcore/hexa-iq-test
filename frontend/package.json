@@ -1,0 +1,20 @@
+{
+  "name": "hexa-iq-test-frontend",
+  "version": "1.0.0",
+  "description": "Hexa IQ Test Frontend",
+  "main": "index.js",
+  "scripts": {
+    "dev": "react-scripts start",
+    "build": "react-scripts build",
+    "start": "serve -s build"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.11.0",
+    "axios": "^1.4.0",
+    "react-countdown": "^2.3.5",
+    "fingerprintjs2": "^2.1.0",
+    "react-scripts": "5.0.1"
+  }
+}
