@@ -1,12 +1,13 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as faceapi from 'face-api.js';
 import './WebcamProctor.css';
 
-const MODEL_URL      = 'https://justadudewhohacks.github.io/face-api.js/models';
-const DETECT_INTERVAL = 1000;
+const MODEL_URL       = 'https://justadudewhohacks.github.io/face-api.js/models';
+const SCAN_INTERVAL   = 300;   // fast scan loop — 3 × 300ms ≈ 900ms per pose
+const SCAN_NEEDED     = 3;
+const DETECT_INTERVAL = 1000;  // normal proctoring loop
 const STREAK_NEEDED   = 3;
 const EVENT_COOLDOWN  = 5000;
-const SCAN_NEEDED     = 2;
 
 const SCAN_STEPS = ['front', 'right', 'left'];
 const SCAN_GAZE  = { front: 'ok', right: 'right', left: 'left' };
@@ -32,170 +33,176 @@ function mean(arr) {
   return arr.reduce((s, v) => s + v, 0) / arr.length;
 }
 
+function estimateGaze(detection) {
+  const pts     = detection.landmarks.positions;
+  const lEye    = pts.slice(36, 42);
+  const rEye    = pts.slice(42, 48);
+  const lecX    = mean(lEye.map(p => p.x));
+  const lecY    = mean(lEye.map(p => p.y));
+  const recX    = mean(rEye.map(p => p.x));
+  const recY    = mean(rEye.map(p => p.y));
+  const eyeMidX = (lecX + recX) / 2;
+  const eyeMidY = (lecY + recY) / 2;
+  const iod     = Math.hypot(recX - lecX, recY - lecY);
+  if (iod < 12) return 'ok';
+  const nose       = pts[30];
+  const yaw        = (nose.x - eyeMidX) / iod;
+  const pitchRatio = (nose.y - eyeMidY) / iod;
+  if (yaw > 0.60)        return 'right';
+  if (yaw < -0.60)       return 'left';
+  if (pitchRatio < 0.45) return 'down';
+  return 'ok';
+}
+
 const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => {
-  const videoRef      = useRef(null);
-  const streamRef     = useRef(null);
-  const loopRef       = useRef(null);
-  const cooldownRef   = useRef({});
-  const streakRef     = useRef({ noFace: 0, away: 0 });
-  // scan state tracked in a ref so the setInterval closure always reads fresh values
-  const scanRef       = useRef({ stepIdx: 0, count: 0, done: compact });
-  const onReadyFired  = useRef(false);
-  // always-fresh callback refs — avoids adding unstable props to useCallback deps
-  const onReadyRef    = useRef(onReady);
-  const onFlagRef     = useRef(onFlag);
-  const onStatusRef   = useRef(onStatusChange);
+  const videoRef     = useRef(null);
+  const streamRef    = useRef(null);
+  const cooldownRef  = useRef({});
+  const onReadyFired = useRef(false);
+  // always-fresh callback refs
+  const onReadyRef   = useRef(onReady);
+  const onFlagRef    = useRef(onFlag);
+  const onStatusRef  = useRef(onStatusChange);
   onReadyRef.current  = onReady;
   onFlagRef.current   = onFlag;
   onStatusRef.current = onStatusChange;
 
-  const [phase,       setPhase]       = useState('loading');
-  const [error,       setError]       = useState(null);
-  const [faceStatus,  setFaceStatus]  = useState('loading');
-  const [modelsOk,    setModelsOk]    = useState(false);
+  const [phase,      setPhase]      = useState('loading');
+  const [error,      setError]      = useState(null);
+  const [faceStatus, setFaceStatus] = useState('loading');
+
+  // Scan UI state
   const [scanStepIdx, setScanStepIdx] = useState(0);
   const [scanCount,   setScanCount]   = useState(0);
   const [stepDone,    setStepDone]    = useState([false, false, false]);
   const [scanDone,    setScanDone]    = useState(compact);
+  const [scanMatch,   setScanMatch]   = useState(false); // current frame matches required pose
 
-  const fire = useCallback((activity, details) => {
-    const now = Date.now();
-    if (now - (cooldownRef.current[activity] || 0) < EVENT_COOLDOWN) return;
-    cooldownRef.current[activity] = now;
-    onFlagRef.current?.({ timestamp: new Date(), activity, details });
-  }, []);
+  useEffect(() => {
+    let alive         = true;
+    let scanTimer     = null;
+    let proctorTimer  = null;
+    let transitioning = false;
+    const scan        = { stepIdx: 0, count: 0 };
 
-  const estimateGaze = useCallback((detection) => {
-    const pts     = detection.landmarks.positions;
-    const lEye    = pts.slice(36, 42);
-    const rEye    = pts.slice(42, 48);
-    const lecX    = mean(lEye.map(p => p.x));
-    const lecY    = mean(lEye.map(p => p.y));
-    const recX    = mean(rEye.map(p => p.x));
-    const recY    = mean(rEye.map(p => p.y));
-    const eyeMidX = (lecX + recX) / 2;
-    const eyeMidY = (lecY + recY) / 2;
-    const iod     = Math.hypot(recX - lecX, recY - lecY);
+    const fire = (activity, details) => {
+      const now = Date.now();
+      if (now - (cooldownRef.current[activity] || 0) < EVENT_COOLDOWN) return;
+      cooldownRef.current[activity] = now;
+      onFlagRef.current?.({ timestamp: new Date(), activity, details });
+    };
 
-    if (iod < 12) return 'ok';
+    const startProctorLoop = () => {
+      const streak = { noFace: 0, away: 0 };
+      proctorTimer = setInterval(async () => {
+        const video = videoRef.current;
+        if (!video || video.readyState < 2 || video.paused) return;
+        try {
+          const dets = await faceapi
+            .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.35 }))
+            .withFaceLandmarks(true);
 
-    const nose       = pts[30];
-    const yaw        = (nose.x - eyeMidX) / iod;
-    const pitchRatio = (nose.y - eyeMidY) / iod;
-
-    if (yaw > 0.60)        return 'right';
-    if (yaw < -0.60)       return 'left';
-    if (pitchRatio < 0.45) return 'down';
-    return 'ok';
-  }, []);
-
-  const startLoop = useCallback(() => {
-    loopRef.current = setInterval(async () => {
-      const video = videoRef.current;
-      if (!video || video.readyState < 2 || video.paused) return;
-
-      try {
-        const dets = await faceapi
-          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.35 }))
-          .withFaceLandmarks(true);
-
-        // ── Guided scan phase (setup screen only) ─────────────────────────
-        if (!scanRef.current.done) {
           if (dets.length === 0) {
-            scanRef.current.count = 0;
+            streak.noFace++;
+            streak.away = 0;
+            setFaceStatus('none');
+            onStatusRef.current?.('none');
+            if (streak.noFace >= STREAK_NEEDED)
+              fire('No face detected', 'Candidate not visible in camera frame during the test');
+            return;
+          }
+          streak.noFace = 0;
+          if (dets.length > 1) {
+            setFaceStatus('multiple');
+            fire('Multiple faces detected', 'More than one person is visible in the camera');
+            return;
+          }
+          const gaze = estimateGaze(dets[0]);
+          setFaceStatus(gaze);
+          onStatusRef.current?.(gaze);
+          if (gaze !== 'ok') {
+            streak.away++;
+            if (streak.away >= STREAK_NEEDED) {
+              const evts = {
+                left:  ['Face turned left',  'Candidate is looking to the left — possible second screen or assistance'],
+                right: ['Face turned right', 'Candidate is looking to the right — possible second screen or assistance'],
+                down:  ['Face looking down', 'Candidate is looking down — possible phone or notes use'],
+              };
+              if (evts[gaze]) fire(evts[gaze][0], evts[gaze][1]);
+            }
+          } else {
+            streak.away = 0;
+          }
+        } catch { /* skip frame */ }
+      }, DETECT_INTERVAL);
+    };
+
+    const advanceScan = (onDone) => {
+      const finishedIdx = scan.stepIdx;
+      setStepDone(prev => { const c = [...prev]; c[finishedIdx] = true; return c; });
+      transitioning = true;
+
+      // Brief pause so user sees the green checkmark before next instruction
+      setTimeout(() => {
+        if (!alive) return;
+        transitioning = false;
+        const nextStep = finishedIdx + 1;
+        if (nextStep >= SCAN_STEPS.length) {
+          onDone();
+        } else {
+          scan.stepIdx = nextStep;
+          scan.count   = 0;
+          setScanStepIdx(nextStep);
+          setScanCount(0);
+          setScanMatch(false);
+        }
+      }, 500);
+    };
+
+    const startScanLoop = (onDone) => {
+      scanTimer = setInterval(async () => {
+        if (!alive || transitioning) return;
+        const video = videoRef.current;
+        if (!video || video.readyState < 2 || video.paused) return;
+
+        try {
+          const dets = await faceapi
+            .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.35 }))
+            .withFaceLandmarks(true);
+
+          if (dets.length === 0) {
+            scan.count = 0;
             setScanCount(0);
+            setScanMatch(false);
             setFaceStatus('none');
             return;
           }
           if (dets.length > 1) {
+            scan.count = 0;
+            setScanCount(0);
+            setScanMatch(false);
             setFaceStatus('multiple');
             return;
           }
 
           const gaze     = estimateGaze(dets[0]);
-          const required = SCAN_GAZE[SCAN_STEPS[scanRef.current.stepIdx]];
+          const required = SCAN_GAZE[SCAN_STEPS[scan.stepIdx]];
           setFaceStatus(gaze);
 
           if (gaze === required) {
-            const next = scanRef.current.count + 1;
-            scanRef.current.count = next;
+            const next = Math.min(scan.count + 1, SCAN_NEEDED);
+            scan.count = next;
             setScanCount(next);
-
-            if (next >= SCAN_NEEDED) {
-              const finishedIdx = scanRef.current.stepIdx;
-              setStepDone(prev => {
-                const copy = [...prev];
-                copy[finishedIdx] = true;
-                return copy;
-              });
-
-              const nextStep = finishedIdx + 1;
-              if (nextStep >= SCAN_STEPS.length) {
-                scanRef.current.done = true;
-                setScanDone(true);
-                if (!onReadyFired.current) {
-                  onReadyFired.current = true;
-                  onReadyRef.current?.();
-                }
-              } else {
-                scanRef.current.stepIdx = nextStep;
-                scanRef.current.count   = 0;
-                setScanStepIdx(nextStep);
-                setScanCount(0);
-              }
-            }
+            setScanMatch(true);
+            if (next >= SCAN_NEEDED) advanceScan(onDone);
           } else {
-            scanRef.current.count = 0;
+            scan.count = 0;
             setScanCount(0);
+            setScanMatch(false);
           }
-          return;
-        }
-
-        // ── Normal proctoring ─────────────────────────────────────────────
-        if (dets.length === 0) {
-          streakRef.current.noFace++;
-          streakRef.current.away = 0;
-          setFaceStatus('none');
-          onStatusRef.current?.('none');
-          if (streakRef.current.noFace >= STREAK_NEEDED) {
-            fire('No face detected', 'Candidate not visible in camera frame during the test');
-          }
-          return;
-        }
-
-        streakRef.current.noFace = 0;
-
-        if (dets.length > 1) {
-          setFaceStatus('multiple');
-          fire('Multiple faces detected', 'More than one person is visible in the camera');
-          return;
-        }
-
-        const gaze = estimateGaze(dets[0]);
-        setFaceStatus(gaze);
-        onStatusRef.current?.(gaze);
-
-        if (gaze !== 'ok') {
-          streakRef.current.away++;
-          if (streakRef.current.away >= STREAK_NEEDED) {
-            const evts = {
-              left:  ['Face turned left',  'Candidate is looking to the left — possible second screen or assistance'],
-              right: ['Face turned right', 'Candidate is looking to the right — possible second screen or assistance'],
-              down:  ['Face looking down', 'Candidate is looking down — possible phone or notes use'],
-            };
-            if (evts[gaze]) fire(evts[gaze][0], evts[gaze][1]);
-          }
-        } else {
-          streakRef.current.away = 0;
-        }
-      } catch {
-        // skip frame silently
-      }
-    }, DETECT_INTERVAL);
-  }, [fire, estimateGaze]);
-
-  useEffect(() => {
-    let alive = true;
+        } catch { /* skip frame */ }
+      }, SCAN_INTERVAL);
+    };
 
     const init = async () => {
       try {
@@ -204,7 +211,6 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
           faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
         ]);
         if (!alive) return;
-        setModelsOk(true);
 
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 320, height: 240, facingMode: 'user' },
@@ -220,13 +226,24 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
         setPhase('ready');
         setFaceStatus('none');
 
-        // Compact mode skips scan — fire onReady immediately
-        if (compact && !onReadyFired.current) {
-          onReadyFired.current = true;
-          onReadyRef.current?.();
+        if (compact) {
+          startProctorLoop();
+          if (!onReadyFired.current) {
+            onReadyFired.current = true;
+            onReadyRef.current?.();
+          }
+        } else {
+          startScanLoop(() => {
+            if (!alive) return;
+            clearInterval(scanTimer);
+            setScanDone(true);
+            startProctorLoop();
+            if (!onReadyFired.current) {
+              onReadyFired.current = true;
+              onReadyRef.current?.();
+            }
+          });
         }
-
-        startLoop();
       } catch (err) {
         if (!alive) return;
         setPhase('error');
@@ -244,10 +261,11 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
 
     return () => {
       alive = false;
-      clearInterval(loopRef.current);
+      clearInterval(scanTimer);
+      clearInterval(proctorTimer);
       streamRef.current?.getTracks().forEach(t => t.stop());
     };
-  }, [startLoop, compact]);
+  }, [compact]);
 
   // ── Compact widget (during test) ─────────────────────────────────────────
   if (compact) {
@@ -302,20 +320,25 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
             muted
             className={`wcp-preview-video${phase === 'ready' ? ' visible' : ''}`}
           />
-          {phase === 'ready' && (
+          {phase === 'ready' && !scanDone && (
             <div className={`wcp-face-badge wcp-face-${faceStatus}`}>
               {STATUS_LABELS[faceStatus] ?? 'Checking…'}
             </div>
           )}
         </div>
 
-        {/* Guided scan progress */}
+        {/* Guided scan */}
         {phase === 'ready' && !scanDone && (
           <div className="wcp-scan">
             <div className="wcp-scan-steps">
               {SCAN_STEPS.map((step, idx) => (
                 <React.Fragment key={step}>
-                  <div className={`wcp-scan-step${stepDone[idx] ? ' done' : ''}${idx === scanStepIdx && !stepDone[idx] ? ' active' : ''}`}>
+                  <div className={[
+                    'wcp-scan-step',
+                    stepDone[idx]                              ? 'done'   : '',
+                    idx === scanStepIdx && !stepDone[idx]     ? 'active' : '',
+                    idx === scanStepIdx && scanMatch && !stepDone[idx] ? 'matched' : '',
+                  ].filter(Boolean).join(' ')}>
                     <div className="wcp-scan-step-circle">
                       {stepDone[idx] ? '✓' : SCAN_ICONS[step]}
                     </div>
@@ -327,13 +350,17 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
                 </React.Fragment>
               ))}
             </div>
-            <div className="wcp-scan-instruction">
-              {SCAN_INSTRUCTIONS[SCAN_STEPS[scanStepIdx]]}
+
+            <div className={`wcp-scan-instruction${scanMatch ? ' matched' : ''}`}>
+              {scanMatch
+                ? 'Hold still…'
+                : SCAN_INSTRUCTIONS[SCAN_STEPS[scanStepIdx]]}
             </div>
+
             <div className="wcp-scan-bar">
               <div
                 className="wcp-scan-bar-fill"
-                style={{ width: `${Math.min((scanCount / SCAN_NEEDED) * 100, 100)}%` }}
+                style={{ width: `${(scanCount / SCAN_NEEDED) * 100}%` }}
               />
             </div>
           </div>
