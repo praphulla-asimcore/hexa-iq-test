@@ -54,43 +54,73 @@ const TestInterface = () => {
     fetchQuestions();
   }, [token, navigate]);
 
-  // Window / devtools anti-cheat (only active once test is started)
+  // Anti-cheat listeners — active only once test is started
   useEffect(() => {
     if (!testStarted) return;
 
-    const handleWindowBlur = () => {
-      windowFocusRef.current = false;
-      const activity = {
-        timestamp: new Date(),
-        activity: 'Window lost focus',
-        details: 'Candidate switched to another window or tab',
-      };
-      setSuspiciousActivities(prev => [...prev, activity]);
-      logActivityToServer(activity);
+    const enterFullscreen = () => {
+      const el = document.documentElement;
+      if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    };
+    enterFullscreen();
+
+    const log = (activity, details) => {
+      const entry = { timestamp: new Date(), activity, details };
+      setSuspiciousActivities(prev => [...prev, entry]);
+      logActivityToServer(entry);
     };
 
+    const handleWindowBlur = () => {
+      windowFocusRef.current = false;
+      log('Window lost focus', 'Candidate switched to another window or tab');
+    };
     const handleWindowFocus = () => { windowFocusRef.current = true; };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden)
+        log('Tab hidden', 'Candidate switched to another tab or minimized the browser');
+    };
+
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        log('Exited fullscreen', 'Candidate exited fullscreen mode during the test');
+        enterFullscreen();
+      }
+    };
+
+    const handleContextMenu = (e) => {
+      e.preventDefault();
+      log('Right-click attempt', 'Candidate right-clicked during the test');
+    };
 
     const handleKeyDown = (e) => {
       if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key))) {
         e.preventDefault();
-        const activity = {
-          timestamp: new Date(),
-          activity: 'Developer tools detected',
-          details: 'Attempt to open browser developer tools',
-        };
-        setSuspiciousActivities(prev => [...prev, activity]);
-        logActivityToServer(activity);
+        log('Developer tools detected', 'Attempt to open browser developer tools');
+      }
+      if (e.ctrlKey && e.key === 'u') {
+        e.preventDefault();
+        log('View source attempt', 'Candidate attempted to view page source (Ctrl+U)');
       }
     };
 
     window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('focus', handleWindowFocus);
     window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('contextmenu', handleContextMenu);
+
     return () => {
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('focus', handleWindowFocus);
       window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('contextmenu', handleContextMenu);
     };
   }, [testStarted]);
 
@@ -110,6 +140,13 @@ const TestInterface = () => {
   const handleCameraFlag = useCallback((event) => {
     setSuspiciousActivities(prev => [...prev, event]);
     logActivityToServer(event);
+  }, [token]);
+
+  const handleCopyAttempt = useCallback((e) => {
+    e.preventDefault();
+    const entry = { timestamp: new Date(), activity: 'Copy attempt', details: 'Candidate attempted to copy question content' };
+    setSuspiciousActivities(prev => [...prev, entry]);
+    logActivityToServer(entry);
   }, [token]);
 
   // Timer — starts only when testStarted is true
@@ -235,7 +272,7 @@ const TestInterface = () => {
 
       <div className="test-container">
         <div className="test-content">
-          <div className="question-section">
+          <div className="question-section" onCopy={handleCopyAttempt} onCut={handleCopyAttempt}>
             <div className="question-number">Question {currentQuestion + 1}</div>
             <h3>{question.question}</h3>
             <div className="options">

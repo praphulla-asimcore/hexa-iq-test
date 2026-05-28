@@ -2,19 +2,30 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as faceapi from 'face-api.js';
 import './WebcamProctor.css';
 
-const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-const DETECT_INTERVAL = 1500;
-const STREAK_NEEDED = 3;      // consecutive bad detections before firing event (~4.5s)
-const EVENT_COOLDOWN = 30000; // ms before same event type can fire again
+const MODEL_URL      = 'https://justadudewhohacks.github.io/face-api.js/models';
+const DETECT_INTERVAL = 1000;
+const STREAK_NEEDED   = 3;
+const EVENT_COOLDOWN  = 5000;
+const SCAN_NEEDED     = 2;
+
+const SCAN_STEPS = ['front', 'right', 'left'];
+const SCAN_GAZE  = { front: 'ok', right: 'right', left: 'left' };
+const SCAN_INSTRUCTIONS = {
+  front: 'Look straight at the camera',
+  right: 'Slowly turn your head to the right',
+  left:  'Slowly turn your head to the left',
+};
+const SCAN_ICONS  = { front: '😐', right: '→', left: '←' };
+const SCAN_LABELS = { front: 'Front', right: 'Right', left: 'Left' };
 
 const STATUS_LABELS = {
-  ok: 'Face detected',
-  none: 'No face visible',
-  left: 'Looking left',
-  right: 'Looking right',
-  down: 'Looking down',
+  ok:       'Face detected',
+  none:     'No face visible',
+  left:     'Looking left',
+  right:    'Looking right',
+  down:     'Looking down',
   multiple: 'Multiple faces',
-  loading: 'Initializing…',
+  loading:  'Initializing…',
 };
 
 function mean(arr) {
@@ -22,50 +33,58 @@ function mean(arr) {
 }
 
 const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => {
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const loopRef = useRef(null);
-  const cooldownRef = useRef({});
-  const streakRef = useRef({ noFace: 0, away: 0 });
+  const videoRef      = useRef(null);
+  const streamRef     = useRef(null);
+  const loopRef       = useRef(null);
+  const cooldownRef   = useRef({});
+  const streakRef     = useRef({ noFace: 0, away: 0 });
+  // scan state tracked in a ref so the setInterval closure always reads fresh values
+  const scanRef       = useRef({ stepIdx: 0, count: 0, done: compact });
+  const onReadyFired  = useRef(false);
+  // always-fresh callback refs — avoids adding unstable props to useCallback deps
+  const onReadyRef    = useRef(onReady);
+  const onFlagRef     = useRef(onFlag);
+  const onStatusRef   = useRef(onStatusChange);
+  onReadyRef.current  = onReady;
+  onFlagRef.current   = onFlag;
+  onStatusRef.current = onStatusChange;
 
-  const [phase, setPhase] = useState('loading'); // 'loading' | 'ready' | 'error'
-  const [error, setError] = useState(null);
-  const [faceStatus, setFaceStatus] = useState('loading');
-  const [modelsOk, setModelsOk] = useState(false);
+  const [phase,       setPhase]       = useState('loading');
+  const [error,       setError]       = useState(null);
+  const [faceStatus,  setFaceStatus]  = useState('loading');
+  const [modelsOk,    setModelsOk]    = useState(false);
+  const [scanStepIdx, setScanStepIdx] = useState(0);
+  const [scanCount,   setScanCount]   = useState(0);
+  const [stepDone,    setStepDone]    = useState([false, false, false]);
+  const [scanDone,    setScanDone]    = useState(compact);
 
   const fire = useCallback((activity, details) => {
     const now = Date.now();
     if (now - (cooldownRef.current[activity] || 0) < EVENT_COOLDOWN) return;
     cooldownRef.current[activity] = now;
-    onFlag?.({ timestamp: new Date(), activity, details });
-  }, [onFlag]);
+    onFlagRef.current?.({ timestamp: new Date(), activity, details });
+  }, []);
 
   const estimateGaze = useCallback((detection) => {
-    const pts = detection.landmarks.positions;
-    const lEye = pts.slice(36, 42);
-    const rEye = pts.slice(42, 48);
-    const lecX = mean(lEye.map(p => p.x));
-    const lecY = mean(lEye.map(p => p.y));
-    const recX = mean(rEye.map(p => p.x));
-    const recY = mean(rEye.map(p => p.y));
+    const pts     = detection.landmarks.positions;
+    const lEye    = pts.slice(36, 42);
+    const rEye    = pts.slice(42, 48);
+    const lecX    = mean(lEye.map(p => p.x));
+    const lecY    = mean(lEye.map(p => p.y));
+    const recX    = mean(rEye.map(p => p.x));
+    const recY    = mean(rEye.map(p => p.y));
     const eyeMidX = (lecX + recX) / 2;
     const eyeMidY = (lecY + recY) / 2;
-    const iod = Math.hypot(recX - lecX, recY - lecY);
+    const iod     = Math.hypot(recX - lecX, recY - lecY);
 
-    if (iod < 12) return 'ok'; // too small / noisy
+    if (iod < 12) return 'ok';
 
-    const nose = pts[30]; // nose tip (68-point model)
-
-    // YAW: nose horizontal displacement from eye midpoint, normalized by IOD
-    // positive = nose right of eye midpoint = head turned right
-    const yaw = (nose.x - eyeMidX) / iod;
-
-    // PITCH DOWN: when head tilts down, nose rises toward eye level
-    // so (nose.y - eyeMid.y) / iod decreases below normal ~1.0–1.4
+    const nose       = pts[30];
+    const yaw        = (nose.x - eyeMidX) / iod;
     const pitchRatio = (nose.y - eyeMidY) / iod;
 
-    if (yaw > 0.60) return 'right';
-    if (yaw < -0.60) return 'left';
+    if (yaw > 0.60)        return 'right';
+    if (yaw < -0.60)       return 'left';
     if (pitchRatio < 0.45) return 'down';
     return 'ok';
   }, []);
@@ -80,11 +99,64 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
           .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.35 }))
           .withFaceLandmarks(true);
 
+        // ── Guided scan phase (setup screen only) ─────────────────────────
+        if (!scanRef.current.done) {
+          if (dets.length === 0) {
+            scanRef.current.count = 0;
+            setScanCount(0);
+            setFaceStatus('none');
+            return;
+          }
+          if (dets.length > 1) {
+            setFaceStatus('multiple');
+            return;
+          }
+
+          const gaze     = estimateGaze(dets[0]);
+          const required = SCAN_GAZE[SCAN_STEPS[scanRef.current.stepIdx]];
+          setFaceStatus(gaze);
+
+          if (gaze === required) {
+            const next = scanRef.current.count + 1;
+            scanRef.current.count = next;
+            setScanCount(next);
+
+            if (next >= SCAN_NEEDED) {
+              const finishedIdx = scanRef.current.stepIdx;
+              setStepDone(prev => {
+                const copy = [...prev];
+                copy[finishedIdx] = true;
+                return copy;
+              });
+
+              const nextStep = finishedIdx + 1;
+              if (nextStep >= SCAN_STEPS.length) {
+                scanRef.current.done = true;
+                setScanDone(true);
+                if (!onReadyFired.current) {
+                  onReadyFired.current = true;
+                  onReadyRef.current?.();
+                }
+              } else {
+                scanRef.current.stepIdx = nextStep;
+                scanRef.current.count   = 0;
+                setScanStepIdx(nextStep);
+                setScanCount(0);
+              }
+            }
+          } else {
+            scanRef.current.count = 0;
+            setScanCount(0);
+          }
+          return;
+        }
+
+        // ── Normal proctoring ─────────────────────────────────────────────
         if (dets.length === 0) {
           streakRef.current.noFace++;
           streakRef.current.away = 0;
           setFaceStatus('none');
-          onStatusChange?.('none');
+          onStatusRef.current?.('none');
           if (streakRef.current.noFace >= STREAK_NEEDED) {
             fire('No face detected', 'Candidate not visible in camera frame during the test');
           }
@@ -101,15 +173,15 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
 
         const gaze = estimateGaze(dets[0]);
         setFaceStatus(gaze);
-        onStatusChange?.(gaze);
+        onStatusRef.current?.(gaze);
 
         if (gaze !== 'ok') {
           streakRef.current.away++;
           if (streakRef.current.away >= STREAK_NEEDED) {
             const evts = {
-              left: ['Face turned left', 'Candidate is looking to the left — possible second screen or assistance'],
+              left:  ['Face turned left',  'Candidate is looking to the left — possible second screen or assistance'],
               right: ['Face turned right', 'Candidate is looking to the right — possible second screen or assistance'],
-              down: ['Face looking down', 'Candidate is looking down — possible phone or notes use'],
+              down:  ['Face looking down', 'Candidate is looking down — possible phone or notes use'],
             };
             if (evts[gaze]) fire(evts[gaze][0], evts[gaze][1]);
           }
@@ -147,7 +219,13 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
         }
         setPhase('ready');
         setFaceStatus('none');
-        onReady?.();
+
+        // Compact mode skips scan — fire onReady immediately
+        if (compact && !onReadyFired.current) {
+          onReadyFired.current = true;
+          onReadyRef.current?.();
+        }
+
         startLoop();
       } catch (err) {
         if (!alive) return;
@@ -169,10 +247,9 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
       clearInterval(loopRef.current);
       streamRef.current?.getTracks().forEach(t => t.stop());
     };
-  }, [startLoop]);
+  }, [startLoop, compact]);
 
-  // ─── Compact widget (during test) ────────────────────────────────────────
-
+  // ── Compact widget (during test) ─────────────────────────────────────────
   if (compact) {
     return (
       <div className={`wcp-widget wcp-status-${faceStatus}`}>
@@ -190,8 +267,7 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
     );
   }
 
-  // ─── Setup screen (before test) ──────────────────────────────────────────
-
+  // ── Setup screen ─────────────────────────────────────────────────────────
   return (
     <div className="wcp-setup">
       <div className="wcp-card">
@@ -199,8 +275,8 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
           <div className="wcp-camera-icon">📷</div>
           <h2 className="wcp-title">Camera Verification Required</h2>
           <p className="wcp-subtitle">
-            Your webcam must remain active throughout the entire test. Face tracking
-            is enabled to ensure test integrity. Ensure you are clearly visible and well-lit.
+            Complete the face scan below to verify your identity before starting.
+            Your webcam will remain active throughout the entire test.
           </p>
         </div>
 
@@ -233,15 +309,46 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
           )}
         </div>
 
-        {phase === 'ready' && (
+        {/* Guided scan progress */}
+        {phase === 'ready' && !scanDone && (
+          <div className="wcp-scan">
+            <div className="wcp-scan-steps">
+              {SCAN_STEPS.map((step, idx) => (
+                <React.Fragment key={step}>
+                  <div className={`wcp-scan-step${stepDone[idx] ? ' done' : ''}${idx === scanStepIdx && !stepDone[idx] ? ' active' : ''}`}>
+                    <div className="wcp-scan-step-circle">
+                      {stepDone[idx] ? '✓' : SCAN_ICONS[step]}
+                    </div>
+                    <div className="wcp-scan-step-label">{SCAN_LABELS[step]}</div>
+                  </div>
+                  {idx < SCAN_STEPS.length - 1 && (
+                    <div className={`wcp-scan-connector${stepDone[idx] ? ' done' : ''}`} />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+            <div className="wcp-scan-instruction">
+              {SCAN_INSTRUCTIONS[SCAN_STEPS[scanStepIdx]]}
+            </div>
+            <div className="wcp-scan-bar">
+              <div
+                className="wcp-scan-bar-fill"
+                style={{ width: `${Math.min((scanCount / SCAN_NEEDED) * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Post-scan checklist */}
+        {phase === 'ready' && scanDone && (
           <div className="wcp-checklist">
-            <div className={`wcp-check-item${modelsOk ? ' done' : ''}`}>
-              <span className="wcp-check-icon">{modelsOk ? '✓' : '○'}</span>
+            <div className="wcp-check-item done">
+              <span className="wcp-check-icon">✓</span>
               Face detection active
             </div>
-            <div className={`wcp-check-item${faceStatus === 'ok' ? ' done' : ''}`}>
-              <span className="wcp-check-icon">{faceStatus === 'ok' ? '✓' : '○'}</span>
-              Face clearly visible
+            <div className="wcp-check-item done">
+              <span className="wcp-check-icon">✓</span>
+              Liveness scan complete — you may start the test
             </div>
           </div>
         )}
