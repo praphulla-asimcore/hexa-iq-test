@@ -66,6 +66,7 @@ const TestEntry = () => {
         <div className="entry-header">
           <img src="/hexa-logo.png" alt="Hexa Logo" className="logo" />
           <h1>Hexa IQ Test</h1>
+          <p className="entry-subtitle">Complete the assessment to proceed</p>
         </div>
 
         <div className="instructions">

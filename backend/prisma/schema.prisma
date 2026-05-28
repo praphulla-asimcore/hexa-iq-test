@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Candidate {
+  id                   String      @id @default(cuid())
+  email                String      @unique
+  name                 String
+  position             String
+  invitationToken      String?
+  invitationExpiry     DateTime?
+  testStarted          Boolean     @default(false)
+  testCompleted        Boolean     @default(false)
+  testStartTime        DateTime?
+  testEndTime          DateTime?
+  browserFingerprint   String?
+  suspiciousActivities Json        @default("[]")
+  createdAt            DateTime    @default(now())
+  testResult           TestResult?
+}
+
+model Invitation {
+  id         String    @id @default(cuid())
+  email      String    @unique
+  name       String?
+  position   String?
+  token      String
+  expiryDate DateTime
+  used       Boolean   @default(false)
+  usedAt     DateTime?
+  createdBy  String    @default("admin")
+  createdAt  DateTime  @default(now())
+}
+
+model TestResult {
+  id                   String    @id @default(cuid())
+  candidateId          String    @unique
+  candidate            Candidate @relation(fields: [candidateId], references: [id])
+  email                String
+  answers              Json      @default("[]")
+  totalMarks           Float     @default(0)
+  percentage           Float?
+  timeTaken            Int?
+  browserFingerprint   String?
+  suspiciousActivities Json      @default("[]")
+  submittedAt          DateTime  @default(now())
+}
+
+model HexaUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String?
+  setupToken   String?
+  setupExpiry  DateTime?
+  active       Boolean   @default(false)
+  invitedBy    String    @default("admin")
+  createdAt    DateTime  @default(now())
+  lastLogin    DateTime?
+}

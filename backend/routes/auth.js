@@ -1,21 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
-const Candidate = require('../models/Candidate');
-const Invitation = require('../models/Invitation');
-const nodemailer = require('nodemailer');
-
-// Email transporter setup
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD
-  }
-});
+const prisma = require('../lib/prisma');
 
 // Admin login
 router.post('/admin/login', (req, res) => {
@@ -26,7 +12,7 @@ router.post('/admin/login', (req, res) => {
   }
 
   const token = jwt.sign(
-    { role: 'admin', email: email },
+    { role: 'admin', email },
     process.env.JWT_SECRET,
     { expiresIn: '24h' }
   );
@@ -39,46 +25,44 @@ router.post('/candidate/verify-invitation', async (req, res) => {
   try {
     const { token, email } = req.body;
 
-    const invitation = await Invitation.findOne({
-      token: token,
-      email: email.toLowerCase(),
-      used: false,
-      expiryDate: { $gt: new Date() }
+    const invitation = await prisma.invitation.findFirst({
+      where: {
+        token,
+        email: email.toLowerCase(),
+        used: false,
+        expiryDate: { gt: new Date() }
+      }
     });
 
     if (!invitation) {
       return res.status(400).json({ error: 'Invalid or expired invitation' });
     }
 
-    // Mark invitation as used
-    invitation.used = true;
-    invitation.usedAt = new Date();
-    await invitation.save();
+    await prisma.invitation.update({
+      where: { id: invitation.id },
+      data: { used: true, usedAt: new Date() }
+    });
 
-    // Create or update candidate
-    let candidate = await Candidate.findOne({ email: email.toLowerCase() });
-    if (!candidate) {
-      candidate = new Candidate({
+    const candidate = await prisma.candidate.upsert({
+      where: { email: email.toLowerCase() },
+      update: { testStarted: false, testCompleted: false },
+      create: {
         email: email.toLowerCase(),
-        name: invitation.name,
-        position: invitation.position
-      });
-    }
-    candidate.testStarted = false;
-    candidate.testCompleted = false;
-    await candidate.save();
+        name: invitation.name || '',
+        position: invitation.position || ''
+      }
+    });
 
-    // Generate test token
     const testToken = jwt.sign(
-      { candidateId: candidate._id, email: candidate.email, role: 'candidate' },
+      { candidateId: candidate.id, email: candidate.email, role: 'candidate' },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    res.json({ 
-      testToken, 
+    res.json({
+      testToken,
       candidate: {
-        id: candidate._id,
+        id: candidate.id,
         name: candidate.name,
         email: candidate.email,
         position: candidate.position
@@ -94,8 +78,11 @@ router.post('/candidate/verify-invitation', async (req, res) => {
 router.post('/candidate/start-test', async (req, res) => {
   try {
     const { email } = req.body;
-    
-    const candidate = await Candidate.findOne({ email: email.toLowerCase() });
+
+    const candidate = await prisma.candidate.findUnique({
+      where: { email: email.toLowerCase() }
+    });
+
     if (!candidate) {
       return res.status(400).json({ error: 'Candidate not found' });
     }
@@ -104,17 +91,18 @@ router.post('/candidate/start-test', async (req, res) => {
       return res.status(400).json({ error: 'Test already completed. Cannot restart.' });
     }
 
-    candidate.testStarted = true;
-    candidate.testStartTime = new Date();
-    await candidate.save();
+    const updated = await prisma.candidate.update({
+      where: { id: candidate.id },
+      data: { testStarted: true, testStartTime: new Date() }
+    });
 
     const testToken = jwt.sign(
-      { candidateId: candidate._id, email: candidate.email, role: 'candidate' },
+      { candidateId: updated.id, email: updated.email, role: 'candidate' },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    res.json({ testToken, startTime: candidate.testStartTime });
+    res.json({ testToken, startTime: updated.testStartTime });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

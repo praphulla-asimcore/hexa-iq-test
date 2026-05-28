@@ -165,6 +165,7 @@ const TestInterface = () => {
       try {
         const testAnswers = questions.map(q => ({
           questionId: q.id,
+          questionText: q.question,
           selectedAnswer: answers[q.id] || ''
         }));
 
@@ -179,7 +180,8 @@ const TestInterface = () => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        localStorage.setItem('testResult', JSON.stringify(response.data));
+        localStorage.setItem('testSubmitted', 'true');
+        localStorage.setItem('candidateName', localStorage.getItem('candidateName') || '');
         navigate('/result');
       } catch (err) {
         alert('Error submitting test: ' + (err.response?.data?.error || err.message));
@@ -209,21 +211,23 @@ const TestInterface = () => {
     <div className="test-interface">
       <div className="test-header">
         <div className="header-info">
-          <h2>IQ Test</h2>
-          <div className="timer" style={{ color: timeLeft < 300 ? 'red' : 'green' }}>
-            ⏱️ {formatTime(timeLeft)}
+          <img src="/hexa-logo.png" alt="Hexa" className="header-logo" />
+          <h2>Hexa IQ Test</h2>
+          <div className={`timer${timeLeft < 300 ? ' danger' : ''}`}>
+            ⏱ {formatTime(timeLeft)}
           </div>
         </div>
         <div className="progress-info">
-          Question {currentQuestion + 1} of {questions.length}
+          <strong>Question {currentQuestion + 1} / {questions.length}</strong>
           <br />
-          Answered: {answeredCount}/{questions.length}
+          Answered: {answeredCount} of {questions.length}
         </div>
       </div>
 
       <div className="test-container">
         <div className="test-content">
           <div className="question-section">
+            <div className="question-number">Question {currentQuestion + 1}</div>
             <h3>{question.question}</h3>
             <div className="options">
               {question.options.map((option, idx) => (
@@ -267,6 +271,11 @@ const TestInterface = () => {
 
         <div className="question-map">
           <h4>Question Map</h4>
+          <div className="map-legend">
+            <span className="legend-answered">Done</span>
+            <span className="legend-current">Current</span>
+            <span className="legend-blank">Blank</span>
+          </div>
           <div className="question-grid">
             {questions.map((q, idx) => (
               <button

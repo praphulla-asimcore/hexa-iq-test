@@ -5,51 +5,39 @@ import '../styles/AdminDashboard.css';
 
 const API = process.env.REACT_APP_API_URL;
 
-const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState('analytics');
-  const [analytics, setAnalytics] = useState(null);
+const HexaUserDashboard = () => {
+  const [activeTab, setActiveTab] = useState('results');
   const [results, setResults] = useState([]);
   const [invitations, setInvitations] = useState([]);
-  const [hexaUsers, setHexaUsers] = useState([]);
   const [expandedRow, setExpandedRow] = useState(null);
   const [search, setSearch] = useState('');
 
-  // Invite candidate form
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [position, setPosition] = useState('');
   const [inviteMsg, setInviteMsg] = useState('');
   const [inviteError, setInviteError] = useState('');
-
-  // Invite hexauser form
-  const [huEmail, setHuEmail] = useState('');
-  const [huName, setHuName] = useState('');
-  const [huMsg, setHuMsg] = useState('');
-  const [huError, setHuError] = useState('');
-
   const [loading, setLoading] = useState(false);
-  const [huLoading, setHuLoading] = useState(false);
+
   const navigate = useNavigate();
-  const token = localStorage.getItem('adminToken');
+  const token = localStorage.getItem('hexaUserToken');
+  const userName = localStorage.getItem('hexaUserName') || 'User';
 
   const fetchAllRef = useRef(null);
   fetchAllRef.current = async () => {
     const h = { Authorization: `Bearer ${token}` };
     try {
-      const [analyticsRes, resultsRes, invitationsRes, hexaUsersRes] = await Promise.all([
-        axios.get(`${API}/api/admin/analytics`, { headers: h }),
+      const [resultsRes, invitationsRes] = await Promise.all([
         axios.get(`${API}/api/admin/results`, { headers: h }),
-        axios.get(`${API}/api/admin/invitations`, { headers: h }),
-        axios.get(`${API}/api/admin/hexausers`, { headers: h })
+        axios.get(`${API}/api/admin/invitations`, { headers: h })
       ]);
-      setAnalytics(analyticsRes.data);
       setResults(resultsRes.data);
       setInvitations(invitationsRes.data);
-      setHexaUsers(hexaUsersRes.data);
     } catch (err) {
-      if (err.response?.status === 401) {
-        localStorage.removeItem('adminToken');
-        navigate('/');
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        localStorage.removeItem('hexaUserToken');
+        localStorage.removeItem('hexaUserName');
+        navigate('/hexauser/login');
       }
     }
   };
@@ -57,7 +45,7 @@ const AdminDashboard = () => {
   const fetchAll = () => fetchAllRef.current();
 
   useEffect(() => {
-    if (!token) { navigate('/'); return; }
+    if (!token) { navigate('/hexauser/login'); return; }
     fetchAll();
   }, []); // eslint-disable-line
 
@@ -77,38 +65,16 @@ const AdminDashboard = () => {
   const handleResend = async (invEmail) => {
     try {
       await axios.post(`${API}/api/admin/resend-invitation/${encodeURIComponent(invEmail)}`, {}, { headers: { Authorization: `Bearer ${token}` } });
-      alert('Invitation resent successfully!');
+      alert('Invitation resent!');
     } catch (err) {
-      alert(err.response?.data?.error || 'Error resending invitation');
-    }
-  };
-
-  const handleInviteHexaUser = async (e) => {
-    e.preventDefault();
-    setHuError(''); setHuMsg(''); setHuLoading(true);
-    try {
-      await axios.post(`${API}/api/admin/invite-hexauser`, { email: huEmail, name: huName }, { headers: { Authorization: `Bearer ${token}` } });
-      setHuMsg(`Invitation sent to ${huEmail}`);
-      setHuEmail(''); setHuName('');
-      fetchAll();
-    } catch (err) {
-      setHuError(err.response?.data?.error || 'Error sending invitation');
-    } finally { setHuLoading(false); }
-  };
-
-  const handleRemoveHexaUser = async (id, userEmail) => {
-    if (!window.confirm(`Remove ${userEmail} from Hexamatics users?`)) return;
-    try {
-      await axios.delete(`${API}/api/admin/hexausers/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-      fetchAll();
-    } catch (err) {
-      alert(err.response?.data?.error || 'Error removing user');
+      alert(err.response?.data?.error || 'Error resending');
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('adminToken');
-    navigate('/');
+    localStorage.removeItem('hexaUserToken');
+    localStorage.removeItem('hexaUserName');
+    navigate('/hexauser/login');
   };
 
   const toggleRow = (id) => setExpandedRow(prev => prev === id ? null : id);
@@ -135,88 +101,21 @@ const AdminDashboard = () => {
       <div className="dashboard-header">
         <div className="header-content">
           <img src="/hexa-logo.png" alt="Hexa Logo" className="logo" />
-          <h1>Admin Dashboard</h1>
+          <div>
+            <h1 style={{ margin: 0 }}>Hexamatics Dashboard</h1>
+            <p style={{ margin: 0, color: '#667eea', fontSize: '0.9rem', fontWeight: 600 }}>Welcome, {userName}</p>
+          </div>
         </div>
         <button className="btn-logout" onClick={handleLogout}>Logout</button>
       </div>
 
       <div className="dashboard-content">
         <div className="tab-nav">
-          <button className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>Analytics</button>
           <button className={`tab-btn ${activeTab === 'results' ? 'active' : ''}`} onClick={() => setActiveTab('results')}>
             All Results {results.length > 0 && <span className="badge">{results.length}</span>}
           </button>
           <button className={`tab-btn ${activeTab === 'invite' ? 'active' : ''}`} onClick={() => setActiveTab('invite')}>Invite Candidates</button>
-          <button className={`tab-btn ${activeTab === 'hexausers' ? 'active' : ''}`} onClick={() => setActiveTab('hexausers')}>
-            Hexamatics Users {hexaUsers.length > 0 && <span className="badge">{hexaUsers.length}</span>}
-          </button>
         </div>
-
-        {/* ANALYTICS TAB */}
-        {activeTab === 'analytics' && analytics && (
-          <div className="tab-content">
-            <div className="stat-cards">
-              <div className="stat-card">
-                <div className="stat-value">{analytics.totalResults}</div>
-                <div className="stat-label">Tests Completed</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-value">{analytics.totalInvitations}</div>
-                <div className="stat-label">Invitations Sent</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-value">{analytics.avgScore}<span className="stat-unit">/40</span></div>
-                <div className="stat-label">Avg Score</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-value">{analytics.avgPercentage}<span className="stat-unit">%</span></div>
-                <div className="stat-label">Avg Percentage</div>
-              </div>
-            </div>
-            <div className="analytics-grid">
-              <div className="card">
-                <h3>Top Scorers</h3>
-                {analytics.topScorers.length === 0 ? (
-                  <p className="empty-msg">No results yet</p>
-                ) : (
-                  <table className="results-table">
-                    <thead><tr><th>#</th><th>Name</th><th>Position</th><th>Score</th><th>%</th></tr></thead>
-                    <tbody>
-                      {analytics.topScorers.map((s, i) => (
-                        <tr key={i}>
-                          <td><span className={`rank rank-${i + 1}`}>{i + 1}</span></td>
-                          <td>{s.name}</td>
-                          <td>{s.position}</td>
-                          <td><strong>{s.totalMarks}/40</strong></td>
-                          <td><span className="score-badge" style={{ background: getScoreColor(s.percentage) }}>{Math.round(s.percentage)}%</span></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-              <div className="card">
-                <h3>Score Distribution</h3>
-                {analytics.totalResults === 0 ? (
-                  <p className="empty-msg">No results yet</p>
-                ) : (
-                  <div className="distribution">
-                    {Object.entries(analytics.distribution).map(([range, count]) => {
-                      const pct = analytics.totalResults > 0 ? (count / analytics.totalResults) * 100 : 0;
-                      return (
-                        <div className="dist-row" key={range}>
-                          <span className="dist-label">{range}%</span>
-                          <div className="dist-bar-wrap"><div className="dist-bar" style={{ width: `${pct}%` }} /></div>
-                          <span className="dist-count">{count}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* RESULTS TAB */}
         {activeTab === 'results' && (
@@ -378,59 +277,9 @@ const AdminDashboard = () => {
             </div>
           </div>
         )}
-
-        {/* HEXAMATICS USERS TAB */}
-        {activeTab === 'hexausers' && (
-          <div className="tab-content">
-            <div className="card">
-              <h3>Invite Hexamatics User</h3>
-              <p className="tab-description">Hexamatics users can view all candidate results, see answer breakdowns, and invite candidates for the test.</p>
-              <form onSubmit={handleInviteHexaUser} className="invitation-form">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Email Address</label>
-                    <input type="email" value={huEmail} onChange={e => setHuEmail(e.target.value)} placeholder="colleague@hexamatics.com" required />
-                  </div>
-                  <div className="form-group">
-                    <label>Full Name</label>
-                    <input type="text" value={huName} onChange={e => setHuName(e.target.value)} placeholder="Jane Smith" required />
-                  </div>
-                </div>
-                {huError && <div className="error-message">{huError}</div>}
-                {huMsg && <div className="success-message">{huMsg}</div>}
-                <button type="submit" className="btn-send" disabled={huLoading}>{huLoading ? 'Sending...' : 'Send Invitation'}</button>
-              </form>
-            </div>
-
-            <div className="card" style={{ marginTop: 24 }}>
-              <h3>Hexamatics Users</h3>
-              {hexaUsers.length === 0 ? (
-                <p className="empty-msg">No Hexamatics users yet. Invite one above.</p>
-              ) : (
-                <div className="table-wrap">
-                  <table className="results-table">
-                    <thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Invited</th><th>Last Login</th><th>Action</th></tr></thead>
-                    <tbody>
-                      {hexaUsers.map((u) => (
-                        <tr key={u.id}>
-                          <td>{u.name}</td>
-                          <td>{u.email}</td>
-                          <td><span className={u.active ? 'badge-used' : 'badge-pending'}>{u.active ? 'Active' : 'Pending Setup'}</span></td>
-                          <td>{new Date(u.createdAt).toLocaleDateString()}</td>
-                          <td>{u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '—'}</td>
-                          <td><button className="btn-remove" onClick={() => handleRemoveHexaUser(u.id, u.email)}>Remove</button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 };
 
-export default AdminDashboard;
+export default HexaUserDashboard;

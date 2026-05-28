@@ -1,0 +1,168 @@
+.hu-auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.hu-auth-container::before {
+  content: '';
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(167,139,250,0.12) 0%, transparent 70%);
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: huOrb 7s ease-in-out infinite alternate;
+}
+
+@keyframes huOrb {
+  from { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+  to   { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+}
+
+.hu-auth-box {
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 24px;
+  padding: 48px 42px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow:
+    0 32px 80px rgba(0,0,0,0.5),
+    0 0 0 1px rgba(167,139,250,0.1),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+  animation: fadeInUp 0.55s cubic-bezier(0.4,0,0.2,1) both;
+  position: relative;
+  z-index: 1;
+}
+
+.hu-auth-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.hu-logo {
+  height: 54px;
+  display: block;
+  margin: 0 auto 18px;
+  filter: drop-shadow(0 0 18px rgba(167,139,250,0.5));
+}
+
+.hu-auth-header h1 {
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.hu-subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.hu-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hu-auth-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.hu-auth-form .form-group label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.hu-auth-form .form-group input {
+  padding: 13px 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  color: var(--text);
+  font-family: inherit;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.hu-auth-form .form-group input::placeholder { color: var(--text-faint); }
+
+.hu-auth-form .form-group input:focus {
+  border-color: var(--accent);
+  background: rgba(167,139,250,0.07);
+  box-shadow: 0 0 0 3px rgba(167,139,250,0.18);
+}
+
+.hu-auth-form .form-group input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-hu-primary {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  font-weight: 700;
+  font-size: 1rem;
+  border-radius: 10px;
+  border: none;
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 20px rgba(102,126,234,0.35);
+  transition: all 0.25s ease;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-hu-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(102,126,234,0.5);
+  filter: brightness(1.08);
+}
+
+.btn-hu-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.hu-auth-footer {
+  text-align: center;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+.hu-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.hu-link:hover { color: #fff; }
+
+@media (max-width: 480px) {
+  .hu-auth-box { padding: 36px 22px; }
+}
