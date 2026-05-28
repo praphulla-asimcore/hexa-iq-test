@@ -4,8 +4,8 @@
   "description": "Hexa IQ Test Frontend",
   "main": "index.js",
   "scripts": {
-    "dev": "craco start",
-    "build": "craco build",
+    "dev": "react-app-rewired start",
+    "build": "react-app-rewired build",
     "start": "serve -s build"
   },
   "dependencies": {
@@ -31,6 +31,6 @@
     ]
   },
   "devDependencies": {
-    "@craco/craco": "^7.1.0"
+    "react-app-rewired": "^2.2.1"
   }
 }
