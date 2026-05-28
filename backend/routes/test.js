@@ -23,7 +23,7 @@ const sendWindowSwitchAlert = async (candidate, details) => {
     await transporter.sendMail({
       from: process.env.SMTP_USER,
       to: recipients.join(', '),
-      subject: `⚠️ Anti-Cheat Alert — ${candidate.name} switched window`,
+      subject: `⚠️ Anti-Cheat Alert — ${candidate.name}: ${details}`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
           <div style="background:#dc3545;padding:24px 30px;border-radius:8px 8px 0 0">
@@ -173,9 +173,17 @@ router.post('/log-activity', verifyCandidateToken, async (req, res) => {
       data: { suspiciousActivities: activities }
     });
 
-    // Send real-time email alert on window switch (non-blocking)
-    if (activity === 'Window lost focus') {
-      sendWindowSwitchAlert(candidate, details || 'User switched to another window or tab');
+    // Send real-time email alert for high-priority events (non-blocking)
+    const alertEvents = [
+      'Window lost focus',
+      'No face detected',
+      'Face looking down',
+      'Face turned left',
+      'Face turned right',
+      'Multiple faces detected',
+    ];
+    if (alertEvents.includes(activity)) {
+      sendWindowSwitchAlert(candidate, details || activity);
     }
 
     res.json({ message: 'Activity logged' });
