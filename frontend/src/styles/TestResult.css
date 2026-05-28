@@ -4,109 +4,76 @@
   align-items: center;
   min-height: 100vh;
   padding: 24px;
-  position: relative;
-  z-index: 1;
-}
-
-/* Celebration particles effect via radial gradients */
-.result-container::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(ellipse at 20% 30%, rgba(16,185,129,0.1) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 70%, rgba(102,126,234,0.1) 0%, transparent 50%);
-  pointer-events: none;
-  animation: resultGlow 3s ease-in-out infinite alternate;
-}
-
-@keyframes resultGlow {
-  from { opacity: 0.6; }
-  to   { opacity: 1; }
+  background: var(--bg);
 }
 
 .result-box {
-  background: rgba(255,255,255,0.04);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255,255,255,0.09);
+  background: #ffffff;
+  border: 1px solid var(--border);
   border-radius: 28px;
   padding: 56px 48px;
   max-width: 520px;
   width: 100%;
   text-align: center;
-  box-shadow:
-    0 40px 100px rgba(0,0,0,0.5),
-    0 0 0 1px rgba(16,185,129,0.1),
-    inset 0 1px 0 rgba(255,255,255,0.08);
-  animation: resultEntrance 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-@keyframes resultEntrance {
-  from { opacity: 0; transform: scale(0.85) translateY(30px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
+  box-shadow: var(--shadow-lg);
+  animation: fadeInUp 0.5s cubic-bezier(0.34, 1.2, 0.64, 1) both;
 }
 
 .result-header {
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
 
 .result-header .logo {
   height: 52px;
   display: block;
   margin: 0 auto;
-  filter: drop-shadow(0 0 18px rgba(102,126,234,0.5));
 }
 
 /* ── Checkmark ── */
 .checkmark {
-  width: 88px;
-  height: 88px;
+  width: 84px;
+  height: 84px;
   background: linear-gradient(135deg, #10b981, #059669);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.6rem;
+  font-size: 2.4rem;
   color: white;
-  margin: 0 auto 28px;
+  margin: 0 auto 26px;
   font-weight: 700;
   box-shadow:
-    0 0 0 12px rgba(16,185,129,0.12),
-    0 0 0 24px rgba(16,185,129,0.06),
-    0 12px 40px rgba(16,185,129,0.4);
-  animation: checkPop 0.6s 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+    0 0 0 10px rgba(16, 185, 129, 0.1),
+    0 8px 30px rgba(16, 185, 129, 0.3);
+  animation: checkPop 0.5s 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 @keyframes checkPop {
-  from { transform: scale(0) rotate(-180deg); opacity: 0; }
+  from { transform: scale(0) rotate(-90deg); opacity: 0; }
   to   { transform: scale(1) rotate(0deg); opacity: 1; }
 }
 
 .thankyou-content h1 {
-  color: #fff;
-  font-size: 2.2rem;
+  color: var(--text);
+  font-size: 2rem;
   font-weight: 800;
   letter-spacing: -0.03em;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .candidate-name {
-  background: linear-gradient(135deg, var(--primary), var(--accent));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-size: 1.15rem;
-  font-weight: 700;
-  margin: 0 0 20px;
   display: block;
+  color: var(--primary);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 18px;
 }
 
 .thankyou-msg {
   color: var(--text-muted);
   font-size: 1rem;
   line-height: 1.7;
-  margin: 0 0 14px;
+  margin: 0 0 12px;
 }
 
 .followup-msg {
@@ -117,13 +84,12 @@
   margin: 0 0 28px;
 }
 
-/* ── Footer note ── */
 .result-footer-note {
-  background: rgba(102,126,234,0.08);
-  border: 1px solid rgba(102,126,234,0.2);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 18px;
-  color: var(--accent);
+  color: var(--text-muted);
   font-size: 0.85rem;
   font-weight: 500;
   margin-bottom: 32px;
@@ -133,7 +99,6 @@
   gap: 8px;
 }
 
-/* ── Close button ── */
 .btn-close {
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   color: white;
@@ -142,19 +107,18 @@
   border: none;
   border-radius: 12px;
   font-size: 1rem;
-  letter-spacing: 0.02em;
-  box-shadow: 0 4px 20px rgba(102,126,234,0.35);
-  transition: all 0.25s ease;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+  transition: var(--transition);
 }
 
 .btn-close:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(102,126,234,0.5);
-  filter: brightness(1.08);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+  filter: brightness(1.06);
 }
 
 @media (max-width: 500px) {
   .result-box { padding: 40px 24px; }
-  .thankyou-content h1 { font-size: 1.7rem; }
-  .checkmark { width: 72px; height: 72px; font-size: 2rem; }
+  .thankyou-content h1 { font-size: 1.6rem; }
+  .checkmark { width: 70px; height: 70px; font-size: 2rem; }
 }

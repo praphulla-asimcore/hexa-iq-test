@@ -4,56 +4,18 @@
   align-items: center;
   min-height: 100vh;
   padding: 24px;
-  position: relative;
-  z-index: 1;
-}
-
-/* Decorative orb behind the card */
-.admin-login-container::before {
-  content: '';
-  position: absolute;
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, rgba(102,126,234,0.15) 0%, transparent 70%);
-  border-radius: 50%;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  animation: loginOrb 6s ease-in-out infinite alternate;
-}
-
-@keyframes loginOrb {
-  from { transform: translate(-50%, -50%) scale(1); }
-  to   { transform: translate(-50%, -50%) scale(1.15); }
+  background: var(--bg);
 }
 
 .login-box {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #ffffff;
+  border: 1px solid var(--border);
   border-radius: 24px;
   padding: 48px 44px;
   width: 100%;
   max-width: 420px;
-  box-shadow:
-    0 32px 80px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(102, 126, 234, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transform-style: preserve-3d;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) both;
-  position: relative;
-  z-index: 1;
-}
-
-.login-box:hover {
-  box-shadow:
-    0 40px 100px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(102, 126, 234, 0.25),
-    0 0 60px rgba(102, 126, 234, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-lg);
+  animation: fadeInUp 0.45s ease both;
 }
 
 .login-header {
@@ -62,37 +24,35 @@
 }
 
 .login-header .logo {
-  height: 58px;
+  height: 56px;
   display: block;
-  margin: 0 auto 20px;
-  filter: drop-shadow(0 0 20px rgba(102, 126, 234, 0.6));
+  margin: 0 auto 18px;
 }
 
 .login-header h1 {
   font-size: 1.6rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--text);
   letter-spacing: -0.02em;
+  margin-bottom: 4px;
 }
 
 .login-header p {
   color: var(--text-muted);
   font-size: 0.9rem;
-  margin-top: 4px;
 }
 
-/* ── Subtitle tag ── */
 .login-badge {
   display: inline-block;
-  background: linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2));
-  border: 1px solid rgba(102,126,234,0.3);
-  color: var(--accent);
-  font-size: 0.75rem;
-  font-weight: 600;
+  background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1));
+  border: 1px solid rgba(102,126,234,0.2);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
   padding: 4px 12px;
   border-radius: 20px;
-  margin-bottom: 16px;
-  letter-spacing: 0.06em;
+  margin-bottom: 14px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -105,7 +65,7 @@
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
 
 .form-group label {
@@ -119,13 +79,13 @@
 .form-group input {
   width: 100%;
   padding: 13px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-subtle);
+  border: 1.5px solid var(--border);
   border-radius: 10px;
   font-size: 0.95rem;
   color: var(--text);
   font-family: inherit;
-  transition: all 0.2s ease;
+  transition: var(--transition);
   outline: none;
 }
 
@@ -133,8 +93,8 @@
 
 .form-group input:focus {
   border-color: var(--primary);
-  background: rgba(102, 126, 234, 0.07);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.18), 0 0 20px rgba(102, 126, 234, 0.1);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
 }
 
 .btn-login {
@@ -147,15 +107,15 @@
   border-radius: 10px;
   border: none;
   margin-top: 4px;
-  letter-spacing: 0.02em;
-  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.35);
-  transition: all 0.25s ease;
+  letter-spacing: 0.01em;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+  transition: var(--transition);
 }
 
 .btn-login:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.5), 0 0 0 1px rgba(102,126,234,0.3);
-  filter: brightness(1.08);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+  filter: brightness(1.06);
 }
 
 .login-footer {
@@ -173,4 +133,4 @@
   transition: color 0.2s;
 }
 
-.login-footer a:hover { color: var(--accent); }
+.login-footer a:hover { color: var(--secondary); text-decoration: underline; }
