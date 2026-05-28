@@ -4,8 +4,8 @@
   "description": "Hexa IQ Test Frontend",
   "main": "index.js",
   "scripts": {
-    "dev": "react-scripts start",
-    "build": "react-scripts build",
+    "dev": "craco start",
+    "build": "craco build",
     "start": "serve -s build"
   },
   "dependencies": {
@@ -29,5 +29,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@craco/craco": "^7.1.0"
   }
 }
