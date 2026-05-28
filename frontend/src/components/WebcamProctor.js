@@ -4,8 +4,8 @@ import './WebcamProctor.css';
 
 const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
 const DETECT_INTERVAL = 1500;
-const STREAK_NEEDED = 2;    // consecutive bad detections before firing event
-const EVENT_COOLDOWN = 22000; // ms before same event type can fire again
+const STREAK_NEEDED = 3;      // consecutive bad detections before firing event (~4.5s)
+const EVENT_COOLDOWN = 30000; // ms before same event type can fire again
 
 const STATUS_LABELS = {
   ok: 'Face detected',
@@ -64,9 +64,9 @@ const WebcamProctor = ({ onFlag, onReady, onStatusChange, compact = false }) => 
     // so (nose.y - eyeMid.y) / iod decreases below normal ~1.0–1.4
     const pitchRatio = (nose.y - eyeMidY) / iod;
 
-    if (yaw > 0.42) return 'right';
-    if (yaw < -0.42) return 'left';
-    if (pitchRatio < 0.62) return 'down';
+    if (yaw > 0.60) return 'right';
+    if (yaw < -0.60) return 'left';
+    if (pitchRatio < 0.45) return 'down';
     return 'ok';
   }, []);
 
