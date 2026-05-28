@@ -246,25 +246,19 @@ const TestInterface = () => {
           </div>
 
           <div className="question-navigation">
-            <button 
+            <button
               onClick={handlePreviousQuestion}
               disabled={currentQuestion === 0}
-              className="btn-nav"
+              className="btn-nav btn-nav-prev"
             >
               ← Previous
             </button>
-            <button 
+            <button
               onClick={handleNextQuestion}
               disabled={currentQuestion === questions.length - 1}
-              className="btn-nav"
+              className="btn-nav btn-nav-next"
             >
               Next →
-            </button>
-          </div>
-
-          <div className="submit-section">
-            <button onClick={handleSubmitTest} className="btn-submit">
-              Submit Test
             </button>
           </div>
         </div>
@@ -286,6 +280,11 @@ const TestInterface = () => {
                 {idx + 1}
               </button>
             ))}
+          </div>
+          <div className="map-submit">
+            <button onClick={handleSubmitTest} className="btn-submit">
+              Submit Test
+            </button>
           </div>
         </div>
       </div>

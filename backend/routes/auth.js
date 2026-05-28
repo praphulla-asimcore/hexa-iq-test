@@ -74,7 +74,7 @@ router.post('/candidate/verify-invitation', async (req, res) => {
   }
 });
 
-// Generate new token for test
+// Validate candidate by email and issue JWT (no timer start)
 router.post('/candidate/start-test', async (req, res) => {
   try {
     const { email } = req.body;
@@ -91,8 +91,59 @@ router.post('/candidate/start-test', async (req, res) => {
       return res.status(400).json({ error: 'Test already completed. Cannot restart.' });
     }
 
+    const testToken = jwt.sign(
+      { candidateId: candidate.id, email: candidate.email, role: 'candidate' },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.json({ testToken });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Save demographics collected before the test
+router.post('/candidate/save-demographics', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (decoded.role !== 'candidate') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { name, address, nationality, gender } = req.body;
+
+    await prisma.candidate.update({
+      where: { id: decoded.candidateId },
+      data: { name, address, nationality, gender }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Begin the test — records testStartTime, called from Guidelines page
+router.post('/candidate/begin-test', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (decoded.role !== 'candidate') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const updated = await prisma.candidate.update({
-      where: { id: candidate.id },
+      where: { id: decoded.candidateId },
       data: { testStarted: true, testStartTime: new Date() }
     });
 

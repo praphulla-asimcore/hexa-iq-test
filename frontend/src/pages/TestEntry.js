@@ -29,7 +29,7 @@ const TestEntry = () => {
       localStorage.setItem('testToken', response.data.testToken);
       localStorage.setItem('candidateEmail', response.data.candidate.email);
       localStorage.setItem('candidateName', response.data.candidate.name);
-      navigate('/test-interface');
+      navigate('/demographics');
     } catch (err) {
       setError(err.response?.data?.error || 'Invitation verification failed');
     } finally {
@@ -52,7 +52,7 @@ const TestEntry = () => {
       );
       localStorage.setItem('testToken', response.data.testToken);
       localStorage.setItem('candidateEmail', email);
-      navigate('/test-interface');
+      navigate('/demographics');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to start test');
     } finally {

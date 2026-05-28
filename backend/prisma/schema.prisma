@@ -12,6 +12,9 @@ model Candidate {
   email                String      @unique
   name                 String
   position             String
+  address              String?
+  nationality          String?
+  gender               String?
   invitationToken      String?
   invitationExpiry     DateTime?
   testStarted          Boolean     @default(false)
